@@ -23,6 +23,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
         "agentic._common_agentic": ["_common_agentic"],
         "agentic.booster_k1_agentic": ["booster_k1_agentic"],
         "basic.booster_k1_basic": ["booster_k1_basic"],
+        "smart.booster_k1": ["booster_k1"],
         "smart.booster_k1_spatial": ["booster_k1_spatial"],
     },
 )

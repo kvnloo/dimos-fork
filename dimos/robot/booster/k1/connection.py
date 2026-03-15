@@ -17,8 +17,10 @@
 
 import asyncio
 import logging
+import sys
 from threading import Thread
 import time
+from typing import Any
 
 from booster_rpc import (
     BoosterConnection,
@@ -30,17 +32,32 @@ from booster_rpc import (
 )
 import cv2
 import numpy as np
+from pydantic import Field
 from reactivex.disposable import Disposable
+import rerun.blueprint as rrb
 
-from dimos import spec
 from dimos.agents.annotation import skill
-from dimos.core import In, Module, Out, rpc
-from dimos.core.global_config import GlobalConfig, global_config
-from dimos.msgs.geometry_msgs import PoseStamped, Twist
-from dimos.msgs.sensor_msgs import CameraInfo, Image, PointCloud2
-from dimos.msgs.sensor_msgs.Image import ImageFormat
+from dimos.core.core import rpc
+from dimos.core.module import Module, ModuleConfig
+from dimos.core.stream import In, Out
+from dimos.msgs.geometry_msgs.PoseStamped import PoseStamped
+from dimos.msgs.geometry_msgs.Twist import Twist
+from dimos.msgs.geometry_msgs.Vector3 import Vector3
+from dimos.msgs.sensor_msgs.CameraInfo import CameraInfo
+from dimos.msgs.sensor_msgs.Image import Image, ImageFormat
+from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
+from dimos.spec.perception import Camera, Pointcloud
+
+if sys.version_info < (3, 13):
+    from typing_extensions import TypeVar
+else:
+    from typing import TypeVar
 
 logger = logging.getLogger(__name__)
+
+
+class ConnectionConfig(ModuleConfig):
+    ip: str = Field(default_factory=lambda m: m["g"].robot_ip)
 
 
 def _camera_info_static() -> CameraInfo:
@@ -62,10 +79,16 @@ def _camera_info_static() -> CameraInfo:
     )
 
 
-class K1Connection(Module, spec.Camera):
+_Config = TypeVar("_Config", bound=ConnectionConfig, default=ConnectionConfig)
+
+
+class K1Connection(Module[_Config], Camera, Pointcloud):
     """Connection module for the Booster K1 humanoid robot."""
 
+    default_config = ConnectionConfig  # type: ignore[assignment]
+
     cmd_vel: In[Twist]
+    # TODO: publish pointcloud, odom, and lidar once K1 hardware exposes this data
     pointcloud: Out[PointCloud2]
     odom: Out[PoseStamped]
     lidar: Out[PointCloud2]
@@ -73,29 +96,30 @@ class K1Connection(Module, spec.Camera):
     camera_info: Out[CameraInfo]
 
     camera_info_static: CameraInfo = _camera_info_static()
-    _global_config: GlobalConfig
     _camera_info_thread: Thread | None = None
     _video_thread: Thread | None = None
     _latest_video_frame: Image | None = None
     _conn: BoosterConnection | None = None
     _running: bool = False
 
-    def __init__(
-        self,
-        ip: str | None = None,
-        cfg: GlobalConfig = global_config,
-        *args,
-        **kwargs,
-    ) -> None:
-        self._global_config = cfg
-        self._ip = ip if ip is not None else self._global_config.robot_ip
-        Module.__init__(self, *args, **kwargs)
+    @classmethod
+    def rerun_views(cls):  # type: ignore[no-untyped-def]
+        """Return Rerun view blueprints for K1 camera visualization."""
+        return [
+            rrb.Spatial2DView(
+                name="Camera",
+                origin="world/robot/camera/rgb",
+            ),
+        ]
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
 
     @rpc
     def start(self) -> None:
         super().start()
 
-        self._conn = BoosterConnection(ip=self._ip)
+        self._conn = BoosterConnection(ip=self.config.ip)
         self._running = True
 
         self._video_thread = Thread(target=self._run_video_stream, daemon=True)
@@ -106,7 +130,7 @@ class K1Connection(Module, spec.Camera):
         self._camera_info_thread = Thread(target=self._publish_camera_info, daemon=True)
         self._camera_info_thread.start()
 
-        logger.info("K1Connection started (ip=%s)", self._ip)
+        logger.info("K1Connection started (ip=%s)", self.config.ip)
 
     @rpc
     def stop(self) -> None:
@@ -130,9 +154,9 @@ class K1Connection(Module, spec.Camera):
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(self._stream_video())
-        except Exception as e:
+        except Exception:
             if self._running:
-                logger.exception(f"Video stream exception: {type(e).__name__}: {e}")
+                logger.exception("Video stream error")
         finally:
             loop.close()
 
@@ -157,15 +181,18 @@ class K1Connection(Module, spec.Camera):
                         if start >= 0 and end >= 0:
                             frame = data[start : end + 2]
                             self._on_frame(frame)
-            except KeyboardInterrupt:
-                break
             except TimeoutError:
                 logger.warning("Video timeout (%s), retrying in 3s...", uri)
+                await asyncio.sleep(3)
+            except Exception as e:
+                if not self._running:
+                    break
+                logger.warning("Video error: %s: %s, retrying in 3s...", type(e).__name__, e)
                 await asyncio.sleep(3)
 
     def _on_frame(self, jpeg_bytes: bytes) -> None:
         if not self._running:
-            raise KeyboardInterrupt
+            return
         arr = cv2.imdecode(np.frombuffer(jpeg_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
         if arr is None:
             return
@@ -186,6 +213,10 @@ class K1Connection(Module, spec.Camera):
         try:
             req = RobotMoveRequest(vx=twist.linear.x, vy=twist.linear.y, vyaw=twist.angular.z)
             self._conn._call(RpcApiId.ROBOT_MOVE, bytes(req))
+            if duration > 0:
+                time.sleep(duration)
+                stop = RobotMoveRequest(vx=0.0, vy=0.0, vyaw=0.0)
+                self._conn._call(RpcApiId.ROBOT_MOVE, bytes(stop))
             return True
         except Exception as e:
             logger.debug("Move command failed: %s", e)
@@ -234,6 +265,50 @@ class K1Connection(Module, spec.Camera):
         except Exception:
             logger.exception("Failed to sit")
             return False
+
+    @skill
+    def walk(self, x: float, y: float = 0.0, yaw: float = 0.0, duration: float = 0.0) -> str:
+        """Move the robot using direct velocity commands. Determine duration required based on user distance instructions.
+
+        Example call:
+            args = { "x": 0.5, "y": 0.0, "yaw": 0.0, "duration": 2.0 }
+            walk(**args)
+
+        Args:
+            x: Forward velocity (m/s)
+            y: Left/right velocity (m/s)
+            yaw: Rotational velocity (rad/s)
+            duration: How long to move (seconds)
+        """
+        twist = Twist(linear=Vector3(x, y, 0), angular=Vector3(0, 0, yaw))
+        success = self.move(twist, duration=duration)
+        if success:
+            return f"Started moving with velocity=({x}, {y}, {yaw}) for {duration} seconds"
+        return "Failed to move."
+
+    @skill
+    def stand(self) -> str:
+        """Make the robot stand up from a sitting or damping position.
+
+        Example call:
+            stand()
+        """
+        success = self.standup()
+        if success:
+            return "Robot is now standing."
+        return "Failed to stand up."
+
+    @skill
+    def liedown(self) -> str:
+        """Make the robot sit down (lie down).
+
+        Example call:
+            liedown()
+        """
+        success = self.sit()
+        if success:
+            return "Robot is now sitting."
+        return "Failed to sit down."
 
     @skill
     def observe(self) -> Image | None:

@@ -14,10 +14,20 @@
 # limitations under the License.
 
 from dimos.core.blueprints import autoconnect
+from dimos.mapping.costmapper import cost_mapper
+from dimos.mapping.voxels import voxel_mapper
+from dimos.navigation.frontier_exploration.wavefront_frontier_goal_selector import (
+    wavefront_frontier_explorer,
+)
+from dimos.navigation.replanning_a_star.module import replanning_a_star_planner
 from dimos.robot.booster.k1.blueprints.basic.booster_k1_basic import booster_k1_basic
 
 booster_k1 = autoconnect(
     booster_k1_basic,
-).global_config(n_dask_workers=6, robot_model="booster_k1")
+    voxel_mapper(voxel_size=0.1),
+    cost_mapper(),
+    replanning_a_star_planner(),
+    wavefront_frontier_explorer(),
+).global_config(n_workers=7, robot_model="booster_k1")
 
 __all__ = ["booster_k1"]

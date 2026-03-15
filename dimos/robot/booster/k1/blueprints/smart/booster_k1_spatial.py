@@ -14,14 +14,14 @@
 # limitations under the License.
 
 from dimos.core.blueprints import autoconnect
+from dimos.perception.perceive_loop_skill import PerceiveLoopSkill
 from dimos.perception.spatial_perception import spatial_memory
 from dimos.robot.booster.k1.blueprints.smart.booster_k1 import booster_k1
-from dimos.utils.monitoring import utilization
 
 booster_k1_spatial = autoconnect(
     booster_k1,
     spatial_memory(),
-    utilization(),
-).global_config(n_dask_workers=8)
+    PerceiveLoopSkill.blueprint(),
+).global_config(n_workers=8)
 
 __all__ = ["booster_k1_spatial"]
