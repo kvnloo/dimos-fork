@@ -18,7 +18,7 @@
 import asyncio
 import logging
 import sys
-from threading import Thread
+from threading import Lock, Thread
 import time
 from typing import Any
 
@@ -114,6 +114,7 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        self._conn_lock = Lock()
 
     @rpc
     def start(self) -> None:
@@ -143,8 +144,9 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
             self._camera_info_thread.join(timeout=1.0)
 
         if self._conn:
-            self._conn.close()
-            self._conn = None
+            with self._conn_lock:
+                self._conn.close()
+                self._conn = None
 
         super().stop()
 
@@ -208,15 +210,19 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
     @rpc
     def move(self, twist: Twist, duration: float = 0.0) -> bool:
         """Send movement command to robot."""
-        if not self._conn:
-            return False
         try:
             req = RobotMoveRequest(vx=twist.linear.x, vy=twist.linear.y, vyaw=twist.angular.z)
-            self._conn.call(RpcApiId.ROBOT_MOVE, bytes(req))
+            with self._conn_lock:
+                if not self._conn:
+                    return False
+                self._conn.call(RpcApiId.ROBOT_MOVE, bytes(req))
             if duration > 0:
                 time.sleep(duration)
                 stop = RobotMoveRequest(vx=0.0, vy=0.0, vyaw=0.0)
-                self._conn.call(RpcApiId.ROBOT_MOVE, bytes(stop))
+                with self._conn_lock:
+                    if not self._conn:
+                        return False
+                    self._conn.call(RpcApiId.ROBOT_MOVE, bytes(stop))
             return True
         except Exception as e:
             logger.debug("Move command failed: %s", e)
@@ -225,29 +231,46 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
     @rpc
     def standup(self) -> bool:
         """Make the robot stand up (DAMPING -> PREPARE -> WALKING)."""
-        if not self._conn:
-            return False
         try:
-            resp = self._conn.call(RpcApiId.GET_ROBOT_STATUS)
+            with self._conn_lock:
+                if not self._conn:
+                    return False
+                resp = self._conn.call(RpcApiId.GET_ROBOT_STATUS)
             status = GetRobotStatusResponse().parse(resp.payload)
 
             if status.mode == RobotMode.WALKING:
                 return True
 
             if status.mode == RobotMode.DAMPING:
-                self._conn.call(
-                    RpcApiId.ROBOT_CHANGE_MODE,
-                    bytes(RobotChangeModeRequest(mode=RobotMode.PREPARE)),
-                )
+                with self._conn_lock:
+                    if not self._conn:
+                        return False
+                    self._conn.call(
+                        RpcApiId.ROBOT_CHANGE_MODE,
+                        bytes(RobotChangeModeRequest(mode=RobotMode.PREPARE)),
+                    )
                 logger.info("K1 mode -> PREPARE")
                 time.sleep(3)
 
-            self._conn.call(
-                RpcApiId.ROBOT_CHANGE_MODE,
-                bytes(RobotChangeModeRequest(mode=RobotMode.WALKING)),
-            )
+            with self._conn_lock:
+                if not self._conn:
+                    return False
+                self._conn.call(
+                    RpcApiId.ROBOT_CHANGE_MODE,
+                    bytes(RobotChangeModeRequest(mode=RobotMode.WALKING)),
+                )
             logger.info("K1 mode -> WALKING")
             time.sleep(3)
+
+            # Verify the mode transition actually succeeded
+            with self._conn_lock:
+                if not self._conn:
+                    return False
+                resp = self._conn.call(RpcApiId.GET_ROBOT_STATUS)
+            status = GetRobotStatusResponse().parse(resp.payload)
+            if status.mode != RobotMode.WALKING:
+                logger.warning("K1 standup: expected WALKING mode but got %s", status.mode)
+                return False
             return True
         except Exception:
             logger.exception("Failed to standup")
@@ -256,10 +279,11 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
     @rpc
     def sit(self) -> bool:
         """Make the robot lie down."""
-        if not self._conn:
-            return False
         try:
-            self._conn.call(RpcApiId.ROBOT_LIE_DOWN)
+            with self._conn_lock:
+                if not self._conn:
+                    return False
+                self._conn.call(RpcApiId.ROBOT_LIE_DOWN)
             logger.info("K1 lying down")
             return True
         except Exception:

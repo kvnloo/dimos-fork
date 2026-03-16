@@ -47,19 +47,6 @@ def _convert_camera_info(camera_info: Any) -> Any:
     )
 
 
-def _convert_global_map(grid: Any) -> Any:
-    return grid.to_rerun(voxel_size=0.1, mode="boxes")
-
-
-def _convert_navigation_costmap(grid: Any) -> Any:
-    return grid.to_rerun(
-        colormap="Accent",
-        z_offset=0.015,
-        opacity=0.2,
-        background="#484981",
-    )
-
-
 def _k1_rerun_blueprint() -> Any:
     """Split layout: camera feed + 3D world view side by side."""
     import rerun.blueprint as rrb
@@ -78,8 +65,6 @@ rerun_config = {
     "pubsubs": [LCM()],
     "visual_override": {
         "world/camera_info": _convert_camera_info,
-        "world/global_map": _convert_global_map,
-        "world/navigation_costmap": _convert_navigation_costmap,
     },
 }
 
