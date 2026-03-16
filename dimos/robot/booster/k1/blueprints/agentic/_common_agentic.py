@@ -16,14 +16,15 @@
 """Shared agentic skills for Booster K1 blueprints."""
 
 from dimos.agents.skills.navigation import navigation_skill
+from dimos.agents.skills.person_follow import person_follow_skill
 from dimos.agents.skills.speak_skill import speak_skill
 from dimos.agents.web_human_input import web_input
 from dimos.core.blueprints import autoconnect
-from dimos.robot.booster.k1.skill_container import booster_k1_skills
+from dimos.robot.booster.k1.connection import K1Connection
 
 _common_agentic = autoconnect(
     navigation_skill(),
-    booster_k1_skills(),
+    person_follow_skill(camera_info=K1Connection.camera_info_static),
     web_input(),
     speak_skill(),
 )

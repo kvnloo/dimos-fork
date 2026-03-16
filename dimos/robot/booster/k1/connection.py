@@ -22,7 +22,7 @@ from threading import Thread
 import time
 from typing import Any
 
-from booster_rpc import (
+from booster_rpc import (  # type: ignore[import-untyped]
     BoosterConnection,
     GetRobotStatusResponse,
     RobotChangeModeRequest,

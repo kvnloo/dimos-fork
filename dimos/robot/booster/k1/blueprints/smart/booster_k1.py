@@ -14,20 +14,13 @@
 # limitations under the License.
 
 from dimos.core.blueprints import autoconnect
-from dimos.mapping.costmapper import cost_mapper
-from dimos.mapping.voxels import voxel_mapper
-from dimos.navigation.frontier_exploration.wavefront_frontier_goal_selector import (
-    wavefront_frontier_explorer,
-)
-from dimos.navigation.replanning_a_star.module import replanning_a_star_planner
 from dimos.robot.booster.k1.blueprints.basic.booster_k1_basic import booster_k1_basic
 
+# TODO: Re-add navigation modules (voxel_mapper, cost_mapper,
+# replanning_a_star_planner, wavefront_frontier_explorer) once K1 hardware
+# exposes odom, pointcloud, and lidar data streams.
 booster_k1 = autoconnect(
     booster_k1_basic,
-    voxel_mapper(voxel_size=0.1),
-    cost_mapper(),
-    replanning_a_star_planner(),
-    wavefront_frontier_explorer(),
-).global_config(n_workers=7, robot_model="booster_k1")
+).global_config(n_workers=4, robot_model="booster_k1")
 
 __all__ = ["booster_k1"]
