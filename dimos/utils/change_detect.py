@@ -45,11 +45,16 @@ def _get_cache_dir() -> Path:
     return Path.home() / ".cache" / "dimos" / "change_detect"
 
 
-def _resolve_paths(paths: Sequence[str | Path]) -> list[Path]:
+def _resolve_paths(
+    paths: Sequence[str | Path], cwd: str | Path | None = None
+) -> list[Path]:
     """Expand globs/directories into a sorted list of individual file paths."""
     files: set[Path] = set()
     for entry in paths:
         entry_str = str(entry)
+        # Resolve relative paths against cwd when provided
+        if cwd is not None and not Path(entry_str).is_absolute():
+            entry_str = str(Path(cwd) / entry_str)
         # Try glob expansion first (handles both glob patterns and plain paths)
         expanded = glob_mod.glob(entry_str, recursive=True)
         if not expanded:
@@ -83,7 +88,11 @@ def _hash_files(files: list[Path]) -> str:
     return h.hexdigest()
 
 
-def did_change(cache_name: str, paths: Sequence[str | Path]) -> bool:
+def did_change(
+    cache_name: str,
+    paths: Sequence[str | Path],
+    cwd: str | Path | None = None,
+) -> bool:
     """Check if any files/dirs matching the given paths have changed since last check.
 
     Args:
@@ -92,6 +101,7 @@ def did_change(cache_name: str, paths: Sequence[str | Path]) -> bool:
         paths: List of file paths, directory paths, or glob patterns.
                Directories are walked recursively.
                Globs are expanded with :func:`glob.glob`.
+        cwd: Optional working directory for resolving relative paths.
 
     Returns:
         ``True`` if any file has changed (or if no previous cache exists).
@@ -100,7 +110,7 @@ def did_change(cache_name: str, paths: Sequence[str | Path]) -> bool:
     if not paths:
         return False
 
-    files = _resolve_paths(paths)
+    files = _resolve_paths(paths, cwd=cwd)
     current_hash = _hash_files(files)
 
     cache_dir = _get_cache_dir()

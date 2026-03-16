@@ -250,13 +250,14 @@ class NativeModule(Module[_NativeConfig]):
         exe = Path(self.config.executable)
 
         # Check if rebuild needed due to source changes
+        needs_rebuild = False
         if self.config.rebuild_on_change and exe.exists():
             cache_name = f"native_{type(self).__name__}_build"
-            if did_change(cache_name, self.config.rebuild_on_change):
+            if did_change(cache_name, self.config.rebuild_on_change, cwd=self.config.cwd):
                 logger.info("Source files changed, triggering rebuild", executable=str(exe))
-                exe.unlink(missing_ok=True)
+                needs_rebuild = True
 
-        if exe.exists():
+        if exe.exists() and not needs_rebuild:
             return
         if self.config.build_command is None:
             raise FileNotFoundError(
