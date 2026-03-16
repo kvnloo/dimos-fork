@@ -481,7 +481,7 @@ wheels = [
 
 [[package]]
 name = "booster-rpc"
-version = "0.0.7"
+version = "0.0.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "betterproto" },
@@ -491,9 +491,9 @@ dependencies = [
     { name = "opencv-python" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e4/46/38acdd4088f392986254b97b75d061568e9d9c396cf4a44f5e65278bd045/booster_rpc-0.0.7.tar.gz", hash = "sha256:efa6aafcef8938a3f3b2e6557a12e23e8afa6ce35cd658aac5b59fb5d6d225dd", size = 4076, upload-time = "2026-03-15T11:16:55.743Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/bf/7374c483d22574c43396a9f3f1e71a411257f2e3ba6129e9754c263803a3/booster_rpc-0.0.8.tar.gz", hash = "sha256:1fecdeab083fcde2ac5dd87c8400ffc14199a626b459b4140f2be8d5cc94d2de", size = 4080, upload-time = "2026-03-16T01:07:40.796Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/85/cd1397344d46d2f4e31d06c3b18e917295cf2bad378bd14d0a9f1625d868/booster_rpc-0.0.7-py3-none-any.whl", hash = "sha256:f069cceb9483d8d9b4fbdfc9aca1f5732c08b11c269f6a8c4904fed178a5216d", size = 5097, upload-time = "2026-03-15T11:16:56.504Z" },
+    { url = "https://files.pythonhosted.org/packages/94/61/b1fb044b1ac8a5d420d20f71f81de83d6248173a7e16846028acefeb837e/booster_rpc-0.0.8-py3-none-any.whl", hash = "sha256:6dad28fc08fb2699c9b0f8ca8f80c5b04626c66b2c1e1759df3e836cdc2a2052", size = 5098, upload-time = "2026-03-16T01:07:41.803Z" },
 ]
 
 [[package]]
@@ -2096,7 +2096,7 @@ requires-dist = [
     { name = "annotation-protocol", specifier = ">=1.4.0" },
     { name = "anthropic", marker = "extra == 'agents'", specifier = ">=0.19.0" },
     { name = "bitsandbytes", marker = "sys_platform == 'linux' and extra == 'agents'", specifier = ">=0.48.2,<1.0" },
-    { name = "booster-rpc", marker = "extra == 'booster'", specifier = ">=0.0.7" },
+    { name = "booster-rpc", marker = "extra == 'booster'", specifier = ">=0.0.8" },
     { name = "catkin-pkg", marker = "extra == 'misc'" },
     { name = "cerebras-cloud-sdk", marker = "extra == 'misc'" },
     { name = "colorlog", specifier = "==6.9.0" },

@@ -199,7 +199,7 @@ unitree = [
 
 booster = [
     "dimos[base,web]",
-    "booster-rpc>=0.0.7",
+    "booster-rpc>=0.0.8",
 ]
 
 manipulation = [

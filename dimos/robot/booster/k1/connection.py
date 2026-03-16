@@ -212,11 +212,11 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
             return False
         try:
             req = RobotMoveRequest(vx=twist.linear.x, vy=twist.linear.y, vyaw=twist.angular.z)
-            self._conn._call(RpcApiId.ROBOT_MOVE, bytes(req))
+            self._conn.call(RpcApiId.ROBOT_MOVE, bytes(req))
             if duration > 0:
                 time.sleep(duration)
                 stop = RobotMoveRequest(vx=0.0, vy=0.0, vyaw=0.0)
-                self._conn._call(RpcApiId.ROBOT_MOVE, bytes(stop))
+                self._conn.call(RpcApiId.ROBOT_MOVE, bytes(stop))
             return True
         except Exception as e:
             logger.debug("Move command failed: %s", e)
@@ -228,21 +228,21 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
         if not self._conn:
             return False
         try:
-            resp = self._conn._call(RpcApiId.GET_ROBOT_STATUS)
+            resp = self._conn.call(RpcApiId.GET_ROBOT_STATUS)
             status = GetRobotStatusResponse().parse(resp.payload)
 
             if status.mode == RobotMode.WALKING:
                 return True
 
             if status.mode == RobotMode.DAMPING:
-                self._conn._call(
+                self._conn.call(
                     RpcApiId.ROBOT_CHANGE_MODE,
                     bytes(RobotChangeModeRequest(mode=RobotMode.PREPARE)),
                 )
                 logger.info("K1 mode -> PREPARE")
                 time.sleep(3)
 
-            self._conn._call(
+            self._conn.call(
                 RpcApiId.ROBOT_CHANGE_MODE,
                 bytes(RobotChangeModeRequest(mode=RobotMode.WALKING)),
             )
@@ -259,7 +259,7 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
         if not self._conn:
             return False
         try:
-            self._conn._call(RpcApiId.ROBOT_LIE_DOWN)
+            self._conn.call(RpcApiId.ROBOT_LIE_DOWN)
             logger.info("K1 lying down")
             return True
         except Exception:
