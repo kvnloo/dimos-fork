@@ -283,7 +283,10 @@ class K1Connection(Module[_Config], Camera, Pointcloud):
         twist = Twist(linear=Vector3(x, y, 0), angular=Vector3(0, 0, yaw))
         success = self.move(twist, duration=duration)
         if success:
-            return f"Started moving with velocity=({x}, {y}, {yaw}) for {duration} seconds"
+            if duration > 0:
+                return f"Moved with velocity=({x}, {y}, {yaw}) for {duration} seconds then stopped"
+            else:
+                return f"Started moving with velocity=({x}, {y}, {yaw}) continuously - send a stop command to halt"
         return "Failed to move."
 
     @skill
